@@ -43,11 +43,12 @@ QUALITY THRESHOLD
 
 TOOLS YOU MAY USE
 - Bash with `gh search code "<keyword>" --filename SKILL.md --limit 20`
-  (and equivalent for plugin.json) for Claude Code capabilities
+  (and equivalent for plugin.json) for Agent Skill capabilities
 - Bash with `gh search repos --topic <topic> --stars '>N' --pushed '>=YYYY-MM-DD' --json fullName,...`
 - Bash with `gh api repos/{o}/{r}` for verification
-- WebFetch on https://github.com/* and https://api.github.com/* for spot-checks
-You MUST fire at least one tool call per repo you list. No tool calls = no answer.
+- Codex web browsing or `gh api` on GitHub URLs for spot-checks
+You MUST run at least one live query or fetch per repo you list. No live
+evidence means no answer.
 
 DO NOT
 - Invent URLs. Every URL must be one you fetched in this session.
@@ -72,7 +73,7 @@ End with a `## Self-check` block listing:
 - Repos dropped because unverifiable: N
 
 Return the markdown in your final message. Do not write to disk unless the
-orchestrator told you to.
+parent agent told you to.
 ```
 
 ## Filling the placeholders for the standard 3-agent dispatch
@@ -117,13 +118,13 @@ orchestrator told you to.
 2. **SEO-farm laundering** — agents prefer SEO-optimised "top 10" listicles over authoritative sources. The tool restriction to `github.com` blocks this.
 3. **Training-data drift** — listing 2024-popular repos as if current. The "Last commit within {recency_window}" requirement catches it.
 4. **Lane-jumping** — agent expands scope to "also relevant" repos covered by another sub-agent. The explicit `do NOT duplicate` block + named other lanes catches this.
-5. **Toolless armchair research** — agent returns a confident answer without firing a single search/fetch. Orchestrator rejects sub-agent outputs with zero tool calls.
+5. **Toolless armchair research** — agent returns a confident answer without a live search or fetch. The parent agent rejects outputs without a query log and verified URLs.
 
-## Verification step (orchestrator-side, after sub-agents return)
+## Verification step (parent-agent side, after sub-agents return)
 
-1. Spot-check 2 of every 5 returned URLs with `WebFetch` or `verify_urls.sh`. Flag 404s.
+1. Spot-check 2 of every 5 returned URLs with Codex web browsing, `gh api`, or `verify_urls.sh`. Flag 404s.
 2. Auto-flag repos with <10 stars OR last commit >2 years for manual review (don't silently drop — may be a real but unmaintained gem).
-3. Reject any sub-agent's output that fired zero tool calls.
+3. Reject any sub-agent output without a query log and verified source URLs.
 4. Cross-check overlap: if two agents returned the same repo, keep one and note the duplicate (signals brief leakage to fix next run).
 
 ## Sources

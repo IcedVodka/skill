@@ -13,7 +13,7 @@ gh search repos "<free-text>" \
   --topic <topic> \
   --language <lang> \
   --stars '>500' \
-  --pushed '>=2025-10-01' \
+  --pushed '>=<YYYY-MM-DD>' \
   --created '>=2024-01-01' \
   --license mit \
   --archived=false \
@@ -43,7 +43,7 @@ gh search code "<keyword>" --filename SKILL.md --limit 20 \
 | `language:` | `language:rust` |
 | `topic:` (repeat for AND) | `topic:cli topic:rust` |
 | `topics:>=N` | `topics:>=3` |
-| `pushed:>=YYYY-MM-DD` | `pushed:>=2025-10-01` |
+| `pushed:>=YYYY-MM-DD` | `pushed:>=2026-01-01` |
 | `created:` | `created:2024-01-01..2024-12-31` |
 | `archived:false` | always include for quality results |
 | `mirror:false` | excludes mirror repos |
@@ -89,7 +89,7 @@ GraphQL beats REST when you need rich per-repo fields in one round-trip
 protection). Same query DSL, same 1000-result cap.
 
 ```bash
-gh api graphql -F q="topic:rag stars:>500 pushed:>=2025-10-01 archived:false" \
+gh api graphql -F q="topic:rag stars:>500 pushed:>=<YYYY-MM-DD> archived:false" \
   -f query='
     query($q: String!) {
       search(query: $q, type: REPOSITORY, first: 100) {

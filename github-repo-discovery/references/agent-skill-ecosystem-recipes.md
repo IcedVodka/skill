@@ -1,10 +1,10 @@
-# 🎯 Claude Code Ecosystem — Search Recipes
+# 🎯 Agent Skill Ecosystems — Search Recipes
 
-When the user asks for a Claude Code skill, plugin, agent, MCP server, hook,
-or sub-agent — read this file FIRST. The Claude Code ecosystem has a
-distinctive structure (`SKILL.md` filename, `.claude-plugin/plugin.json`,
-official Anthropic marketplace) that lets you find things repo-name search
-cannot.
+When the user asks for a Codex or Claude Code skill, plugin, agent, MCP
+server, hook, or sub-agent, read this file first. Both ecosystems use
+`SKILL.md`; plugin manifests distinguish `.codex-plugin/plugin.json` from
+`.claude-plugin/plugin.json`. These fixed filenames surface candidates that
+repo-name search cannot find.
 
 ## The magic query (works for almost any niche capability)
 
@@ -13,7 +13,7 @@ gh search code "<keyword>" --filename SKILL.md --limit 20 \
   --json repository,path,textMatches
 ```
 
-Why it works: Claude Code skills always live in a file named `SKILL.md`.
+Why it works: Agent Skills normally live in a file named `SKILL.md`.
 That gives you a precision filter that repo-name search doesn't have. The
 same intent expressed as a repo-name search will frequently return zero
 hits because repo names rarely contain the natural-language phrases users
@@ -35,14 +35,19 @@ gh search code "description: <keyword>" --filename SKILL.md
 ## Step-by-step recipe
 
 1. **Start in the canonical awesome-list** — `gh api repos/hesreallyhim/awesome-claude-code/contents/README.md` then base64-decode and grep. Curated quality bar > raw search.
-2. **Check the official Anthropic marketplace** — two repos:
+2. **For Claude Code, check the official Anthropic marketplace** — two repos:
    - `anthropics/claude-plugins-official` — gated, version-pinned plugins exposed in Claude Code's installer (33 plugins as of April 2026, including `commit-commands`, `frontend-design`, `hookify`, `code-review`)
    - `anthropics/skills` — public Agent Skills repo with `skills/` (17 official skills) and `template/SKILL.md`
 3. **Code-search SKILL.md files** — the magic query above. Highest signal per query.
 4. **Code-search `plugin.json`** — catches plugin-wrapped variants of the same skill.
-5. **Topic search with star floor** — `gh search repos --topic claude-skills --stars '>50' --pushed '>=2025-10-01' --limit 50`. Topics without star/freshness filters drown you in spam.
+5. **Topic search with star floor** — `gh search repos --topic claude-skills --stars '>50' --pushed '>=YYYY-MM-DD' --limit 50`. Choose the date from the requested freshness window; topics without star/freshness filters drown you in spam.
 6. **Cross-reference secondary awesome-lists** — `VoltAgent/awesome-agent-skills`, `sickn33/antigravity-awesome-skills`. Same data, different curators.
-7. **Verify before recommending** — open `SKILL.md`, confirm frontmatter shape, last push within 60 days, no OpenAI/Cursor-only branding.
+7. **For Codex plugins, verify the manifest** — require
+   `.codex-plugin/plugin.json`; treat `skills/`, `agents/`, `apps/`, and MCP
+   configuration as optional plugin contents.
+8. **Verify before recommending** — open `SKILL.md` or the plugin manifest,
+   confirm its shape and last push, and ensure it supports the runtime the
+   user requested.
 
 ## Live awesome-lists (verified 2026-04-25)
 
@@ -71,7 +76,7 @@ Avoid: `ccplugins/awesome-claude-code-plugins` (stale, last push 2025-10).
 Topic discovery is decent for breadth but noisy at the top — many sub-1k
 star repos use topics for SEO. Always combine with a star floor.
 
-## Canonical layout to look for
+## Canonical layouts to look for
 
 ```
 <repo>/
@@ -83,8 +88,19 @@ star repos use topics for SEO. Always combine with a star floor.
     references/          # optional doc fragments
 ```
 
-A repo without `.claude-plugin/plugin.json` AND without `SKILL.md` is
-probably not a real Claude Code skill — it may be a generic prompt collection.
+```text
+<repo>/
+  .codex-plugin/
+    plugin.json          # required Codex plugin manifest
+  skills/<skill-name>/
+    SKILL.md             # optional plugin-contributed skill
+    scripts/             # optional helper scripts
+    references/          # optional reference material
+```
+
+A candidate without the requested ecosystem's plugin manifest and without
+`SKILL.md` is probably a generic prompt collection, not an installable skill
+or plugin.
 
 ## Caveats
 
@@ -106,4 +122,3 @@ probably not a real Claude Code skill — it may be a generic prompt collection.
 - **Inflated star counts** — single-author harnesses with 100k+ stars are
   almost always inflated or include fork/aggregator counts. Cross-check
   fork ratio and contributor count.
-

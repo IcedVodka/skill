@@ -17,10 +17,12 @@ fi
 
 fail=0
 for url in "$@"; do
-  status=$(curl -s -o /dev/null -L -w "%{http_code}" \
+  if ! status=$(curl -s -o /dev/null -L -w "%{http_code}" \
     -A "github-repo-discovery/1.0" \
     --max-time 10 \
-    "$url" 2>/dev/null || echo "000")
+    "$url" 2>/dev/null); then
+    status="000"
+  fi
 
   case "$status" in
     200|301|302)

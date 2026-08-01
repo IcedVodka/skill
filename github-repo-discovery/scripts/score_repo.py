@@ -8,7 +8,7 @@ catch fake-star inflation, abandoned-but-popular projects, and AI slop.
 Usage:
     python score_repo.py owner/repo [--keywords kw1,kw2,...]
 
-Requires `gh` CLI authenticated (or GITHUB_PERSONAL_ACCESS_TOKEN in env).
+Requires `gh` CLI authenticated via `gh auth login` or a supported token.
 """
 
 from __future__ import annotations
@@ -107,7 +107,10 @@ def fetch_scorecard(owner_repo: str) -> float | None:
     """Return OpenSSF Scorecard aggregate (0-10) or None if not in dataset."""
     url = f"https://api.securityscorecards.dev/projects/github.com/{owner_repo}"
     try:
-        with urllib.request.urlopen(url, timeout=10) as r:
+        request = urllib.request.Request(
+            url, headers={"User-Agent": "github-repo-discovery/1.0"}
+        )
+        with urllib.request.urlopen(request, timeout=10) as r:
             return float(json.loads(r.read()).get("score"))
     except (urllib.error.HTTPError, urllib.error.URLError, ValueError, TimeoutError):
         return None
@@ -314,14 +317,21 @@ def main() -> None:
 
     keywords = [k.strip() for k in args.keywords.split(",") if k.strip()]
 
-    if not (
+    token_available = bool(
         os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN")
         or os.environ.get("GH_TOKEN")
         or os.environ.get("GITHUB_TOKEN")
-    ):
+    )
+    gh_authenticated = subprocess.run(
+        ["gh", "auth", "status", "--hostname", "github.com"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).returncode == 0
+    if not token_available and not gh_authenticated:
         print(
-            "warning: no GITHUB_PERSONAL_ACCESS_TOKEN / GH_TOKEN / GITHUB_TOKEN in env. "
-            "gh CLI must be authenticated for higher rate limits.",
+            "warning: gh CLI is not authenticated; run `gh auth login` or set "
+            "GH_TOKEN/GITHUB_TOKEN for higher rate limits.",
             file=sys.stderr,
         )
 

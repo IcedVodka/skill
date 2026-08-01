@@ -1,14 +1,14 @@
 ---
 name: github-repo-discovery
 description: >
-  Find and classify the top GitHub repositories in any category. Picks the right `gh` search strategy per category, dispatches parallel sub-agents across established/rising/niche lanes, and scores candidates with a slop-aware rubric that survives fake-star inflation. **Use this skill whenever the user mentions any of: "find me a repo for X", "top GitHub repos for Y", "best library for X", "what's the best framework for Y", "find a Claude Code skill that...", "is there a plugin for X", "what MCP servers do Y", "find an open-source X", "top trending in Y", "what tool does X", "compare repos for Y", "GitHub repo discovery", "search GitHub for X", "find me a tool to Y", "any good repos for Z", "what's everyone using for X", "spring clean / tidy up my repos list", or any variation expressing the desire to discover, compare, or classify open-source projects on GitHub.** Don't wait for the user to say "GitHub" explicitly — if they signal intent to find or compare open-source projects, this is the right skill. For Claude Code capabilities specifically, the skill code-searches inside `SKILL.md` and `plugin.json` files, which is the difference between zero hits and twenty real candidates (the magic query that beats repo-name search).
+  Find and classify the top GitHub repositories in any category. Select the right `gh` search strategy, optionally dispatch parallel sub-agents across established/rising/niche lanes, and score candidates with a slop-aware rubric that resists fake-star inflation. Use when the user asks to find, compare, rank, or classify GitHub repositories, open-source tools, libraries, frameworks, Agent Skills, Codex or Claude Code plugins, MCP servers, or trending projects, even when they do not explicitly mention GitHub.
 ---
 
 # 🔍 GitHub Repo Discovery
 
 Help the user find and classify the top GitHub repositories in any category.
-The skill assumes you have `gh` CLI authenticated (via `GITHUB_PERSONAL_ACCESS_TOKEN`
-or `gh auth login`) and access to parallel sub-agents.
+The skill assumes `gh` CLI is authenticated via `gh auth login` or a supported
+token. Parallel sub-agents are optional; use them only when available and useful.
 
 ## 🎯 The core insight (read first)
 
@@ -16,8 +16,8 @@ The right query *type* matters more than a smarter ranker. For niche
 capabilities, a naive `gh search repos "<natural-language description>"`
 often returns zero hits because no repo's *name* contains the phrase the
 user used. The same intent expressed as a code search inside a fixed
-filename — `gh search code "<keyword>" --filename SKILL.md` for Claude Code
-skills, `--filename plugin.json` for plugins, `--filename Cargo.toml` for
+filename — `gh search code "<keyword>" --filename SKILL.md` for Agent Skills,
+`--filename plugin.json` for plugins, `--filename Cargo.toml` for
 Rust libraries — typically returns dozens of real candidates. Picking the
 wrong query type returns nothing even when the answer exists. Always start
 by classifying the category and choosing a strategy before searching.
@@ -35,8 +35,9 @@ strategy and announce it before searching so the user can redirect.
 
 | Category signal | Primary strategy | Reference |
 |---|---|---|
-| "claude code skill", "skill that <verb>", any Claude Code capability | `gh search code "<keyword>" --filename SKILL.md --limit 20` | `references/claude-code-ecosystem-recipes.md` |
-| "claude code plugin", "marketplace", an Anthropic-managed thing | `gh api repos/anthropics/claude-plugins-official/contents/plugins`, then `gh search code "<keyword>" --filename plugin.json` | `references/claude-code-ecosystem-recipes.md` |
+| "agent skill", "codex skill", "claude code skill", "skill that <verb>" | `gh search code "<keyword>" --filename SKILL.md --limit 20` | `references/agent-skill-ecosystem-recipes.md` |
+| "claude code plugin", "marketplace", an Anthropic-managed thing | `gh api repos/anthropics/claude-plugins-official/contents/plugins`, then `gh search code "<keyword>" --filename plugin.json` | `references/agent-skill-ecosystem-recipes.md` |
+| "codex plugin", a Codex-managed thing | `gh search code "<keyword>" --filename plugin.json`, then verify `.codex-plugin/plugin.json` | `references/agent-skill-ecosystem-recipes.md` |
 | Language + tool type ("rust cli", "python orchestrator") | `gh search repos --topic <type> --language <lang> --stars '>500' --pushed '>=YYYY-MM-DD'` | `references/search-api-cheatsheet.md` |
 | Generic category ("AI agent frameworks", "vector database") | Topic search with star floor + freshness, plus `awesome-<topic>` lookup | `references/search-api-cheatsheet.md` |
 | Returns >1000 results | Partition on `stars:` ranges (binary-search the cutoff so each slice ≤1000) | `references/search-api-cheatsheet.md` |
@@ -52,11 +53,11 @@ ranking and changes it without notice.
 
 ```bash
 gh search repos --topic <topic> --language <lang> --stars '>500' \
-  --pushed '>=2025-10-01' --archived=false --sort stars --limit 100 \
+  --pushed '>=<YYYY-MM-DD>' --archived=false --sort stars --limit 100 \
   --json fullName,description,stargazersCount,forksCount,pushedAt,url,license
 ```
 
-For Claude Code skill discovery, the magic query:
+For Agent Skill discovery, the high-signal query is:
 
 ```bash
 gh search code "<keyword>" --filename SKILL.md --limit 20 \
@@ -72,29 +73,32 @@ Use this rule:
 
 - **≤10 high-quality candidates** from the primary query → score them
   directly, skip sub-agents. Faster, cheaper, less noise.
-- **>10 candidates OR clear sub-lanes** in the category → dispatch N=3
-  parallel sub-agents using the brief in
+- **>10 candidates OR clear sub-lanes** in the category → when collaboration
+  tools and enough slots are available, dispatch up to N=3 parallel sub-agents
+  using the brief in
   `references/sub-agent-brief-template.md`. The lanes:
   - **Agent A — Established:** ≥1000 stars, created ≥2y ago, pushed in last 90d
   - **Agent B — Rising:** ≥100 stars, created ≤12mo ago, pushed in last 30d, sort by stars-per-day
   - **Agent C — Niche:** lower star floor, broader topic match, code search inside `SKILL.md` / `plugin.json`
 
-Every brief MUST include the `## What other agents are covering — DO NOT
+If parallel sub-agents are unavailable, run the same lanes sequentially in
+the current agent. Do not turn tool availability into a blocker.
+
+Every delegated brief MUST include the `## What other agents are covering — DO NOT
 DUPLICATE` block listing the other lanes verbatim. Anthropic's own
 multi-agent post-mortem identified vague-brief duplication as the #1
 failure mode for parallel research, so this is non-negotiable. Read
 `references/sub-agent-brief-template.md` for the full template.
 
-If a sub-agent returns its result with **zero tool calls fired**, reject
-the output and re-run — that pattern is training-data fabrication, not
-real research.
+Require each sub-agent to return its query log and verified source URLs. If
+the result has no live-search evidence, reject it and re-run the lane.
 
 ## 📊 Step 4 — Score candidates
 
 Run the scoring script for each candidate:
 
 ```bash
-python skill/scripts/score_repo.py owner/repo --keywords "kw1,kw2,kw3"
+python3 <skill-dir>/scripts/score_repo.py owner/repo --keywords "kw1,kw2,kw3"
 ```
 
 Returns JSON with a 0-100 score plus a per-signal breakdown. The script
@@ -114,12 +118,13 @@ script is the canonical implementation.
 
 These four checks catch fabrications and dead links:
 
-1. **Spot-check 2 of every 5 returned URLs** with `WebFetch` or `curl`. Use
-   `skill/scripts/verify_urls.sh url1 url2 ...` for a quick pass. Reject 404s.
+1. **Spot-check 2 of every 5 returned URLs** with Codex web browsing or
+   `curl`. Use `<skill-dir>/scripts/verify_urls.sh url1 url2 ...` for a quick
+   pass. Reject 404s.
 2. **Auto-flag** any repo with <10 stars OR last commit >2 years for manual
    review. Don't silently drop — the agent may have found a real but
    unmaintained gem.
-3. **Reject zero-tool-call sub-agent outputs** (training-data fabrications).
+3. **Reject sub-agent outputs without a query log and verified source URLs.**
 4. **Note duplicate repos across agents** — if two lanes returned the same
    repo, log it (signals brief leakage to fix next run).
 
@@ -176,7 +181,7 @@ adjust thresholds, or notice that the strategy missed a sub-niche.
 |------|-------------|
 | `references/search-api-cheatsheet.md` | Building a `gh search repos` query, hitting the 1000-result cap, choosing REST vs GraphQL |
 | `references/scoring-rubric.md` | Understanding what `score_repo.py` computes, scoring inline without the script, tweaking weights |
-| `references/claude-code-ecosystem-recipes.md` | Any Claude Code skill/plugin/agent search; awesome-list locations; the official Anthropic marketplace |
+| `references/agent-skill-ecosystem-recipes.md` | Any Agent Skill or Codex/Claude plugin search; ecosystem layouts and high-signal code searches |
 | `references/sub-agent-brief-template.md` | Constructing the briefs for the three parallel sub-agents (read every time you dispatch) |
 
 ## 🛠️ Bundled scripts
