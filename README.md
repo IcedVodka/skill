@@ -31,7 +31,7 @@
 
 ```bash
 python ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
-  --repo IcedVodka/skill \
+  --repo IcedVodka/personal-codex-skills \
   --ref master \
   --path chinese-writing gh-cli github-repo-discovery grilling kimi-webbridge
 ```
